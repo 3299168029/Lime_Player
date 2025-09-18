@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart'; // 用于debugPrint（调试友好，Release模式自动忽略）
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,7 +14,7 @@ class AudioFile {
   final String? artist;
   final String? album;
   final int? duration;
-  final Uint8List? albumArtBytes; // 改为存储封面字节（而非路径）
+  final Uint8List? albumArtBytes;
 
   AudioFile({
     required this.path,
@@ -22,56 +22,51 @@ class AudioFile {
     this.artist,
     this.album,
     this.duration,
-    this.albumArtBytes, // 替换原有的albumArtPath
+    this.albumArtBytes,
   });
 }
 
 class AudioService {
-  // 支持的音频格式（明确标识，方便排查格式不支持问题）
   final List<String> _supportedExtensions = [
     '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg'
   ];
 
-  // 获取所有艺术家（添加日志，排查分组异常）
+  // 1. 精简过程日志，只保留结果和错误
   Future<List<Artist>> getAllArtists() async {
     try {
-      debugPrint('[AudioService] 开始获取所有艺术家');
       final audioFiles = await getAllAudioFiles();
       if (audioFiles.isEmpty) {
-        debugPrint('[AudioService] 获取所有艺术家：无音频文件可分组');
+        debugPrint('[AudioService] 无音频文件可分组艺术家');
         return [];
       }
       final artists = Artist.fromAudioFiles(audioFiles);
       debugPrint('[AudioService] 成功获取 ${artists.length} 个艺术家');
       return artists;
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 获取所有艺术家失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 获取艺术家失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       return [];
     }
   }
 
-  // 获取所有专辑（添加日志，排查专辑分组异常）
   Future<List<Album>> getAllAlbums() async {
     try {
-      debugPrint('[AudioService] 开始获取所有专辑');
       final audioFiles = await getAllAudioFiles();
       if (audioFiles.isEmpty) {
-        debugPrint('[AudioService] 获取所有专辑：无音频文件可分组');
+        debugPrint('[AudioService] 无音频文件可分组专辑');
         return [];
       }
       final albums = Album.fromAudioFiles(audioFiles);
       debugPrint('[AudioService] 成功获取 ${albums.length} 个专辑');
       return albums;
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 获取所有专辑失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 获取专辑失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       return [];
     }
   }
 
-  // 根据艺术家名称获取歌曲（添加筛选日志，排查匹配异常）
+  // 2. 筛选结果日志保留，移除"开始筛选"冗余前缀
   Future<List<AudioFile>> getSongsByArtist(String artistName) async {
     try {
-      debugPrint('[AudioService] 开始筛选艺术家「$artistName」的歌曲');
       final audioFiles = await getAllAudioFiles();
       final matchedSongs = audioFiles.where((file) => 
         (file.artist ?? "未知艺术家") == artistName
@@ -79,35 +74,31 @@ class AudioService {
       debugPrint('[AudioService] 艺术家「$artistName」匹配到 ${matchedSongs.length} 首歌曲');
       return matchedSongs;
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 筛选艺术家「$artistName」歌曲失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 筛选艺术家「$artistName」歌曲失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       return [];
     }
   }
 
-  // 根据专辑和艺术家获取歌曲（添加联合筛选日志）
   Future<List<AudioFile>> getSongsByAlbum(String albumName, String artistName) async {
     try {
-      debugPrint('[AudioService] 开始筛选专辑「$albumName」(艺术家：$artistName) 的歌曲');
       final audioFiles = await getAllAudioFiles();
       final matchedSongs = audioFiles.where((file) => 
         (file.album ?? "未知专辑") == albumName && 
         (file.artist ?? "未知艺术家") == artistName
       ).toList();
-      debugPrint('[AudioService] 专辑「$albumName」匹配到 ${matchedSongs.length} 首歌曲');
+      debugPrint('[AudioService] 专辑「$albumName」(艺术家：$artistName) 匹配到 ${matchedSongs.length} 首歌曲');
       return matchedSongs;
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 筛选专辑「$albumName」歌曲失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 筛选专辑「$albumName」歌曲失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       return [];
     }
   }
 
-  // 保存文件夹（添加路径校验和重复判断日志）
+  // 3. 保存文件夹：合并"开始/成功"日志，保留关键校验信息
   Future<void> saveFolder(String folderPath) async {
     try {
-      debugPrint('[AudioService] 开始保存文件夹：$folderPath');
-      // 先校验文件夹是否存在（避免保存无效路径）
       if (!Directory(folderPath).existsSync()) {
-        throw Exception('文件夹不存在：$folderPath');
+        throw Exception('文件夹不存在');
       }
       final prefs = await SharedPreferences.getInstance();
       List<String> folders = prefs.getStringList('music_folders') ?? [];
@@ -118,31 +109,29 @@ class AudioService {
       }
       folders.add(folderPath);
       await prefs.setStringList('music_folders', folders);
-      debugPrint('[AudioService] 成功保存文件夹：$folderPath（当前共 ${folders.length} 个文件夹）');
+      debugPrint('[AudioService] 保存文件夹成功：$folderPath（当前共 ${folders.length} 个文件夹）');
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 保存文件夹「$folderPath」失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
-      rethrow; // 如需上层捕获，可保留rethrow；如需静默处理，可删除
+      debugPrint('[AudioService] 保存文件夹「$folderPath」失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
+      rethrow;
     }
   }
 
-  // 获取已保存的文件夹（添加数量日志）
+  // 4. 移除"开始获取"日志，只保留结果统计
   Future<List<String>> getSavedFolders() async {
     try {
-      debugPrint('[AudioService] 开始获取已保存的文件夹');
       final prefs = await SharedPreferences.getInstance();
       final folders = prefs.getStringList('music_folders') ?? [];
-      debugPrint('[AudioService] 成功获取 ${folders.length} 个已保存文件夹');
+      debugPrint('[AudioService] 已保存文件夹数量：${folders.length}');
       return folders;
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 获取已保存文件夹失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 获取已保存文件夹失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       return [];
     }
   }
 
-  // 移除文件夹（添加关联音频删除日志）
+  // 5. 移除文件夹：精简过程日志，保留核心操作结果
   Future<void> removeFolder(String folderPath) async {
     try {
-      debugPrint('[AudioService] 开始移除文件夹：$folderPath');
       final prefs = await SharedPreferences.getInstance();
       List<String> folders = prefs.getStringList('music_folders') ?? [];
       
@@ -152,248 +141,215 @@ class AudioService {
       }
       folders.remove(folderPath);
       await prefs.setStringList('music_folders', folders);
-      // 移除该文件夹下的音频记录（添加子操作日志）
       await _removeAudioFilesFromFolder(folderPath);
-      debugPrint('[AudioService] 成功移除文件夹：$folderPath（当前剩余 ${folders.length} 个文件夹）');
+      debugPrint('[AudioService] 移除文件夹成功：$folderPath（剩余 ${folders.length} 个文件夹）');
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 移除文件夹「$folderPath」失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 移除文件夹「$folderPath」失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       rethrow;
     }
   }
 
-  // 扫描音频文件（核心流程：添加逐环节日志，定位扫描/元数据/封面问题）
+  // 6. 扫描音频：用批量统计替代逐个文件日志，只保留错误和最终结果
   Future<List<AudioFile>> scanAudioFiles(String folderPath) async {
-  List<AudioFile> audioFiles = [];
-  final directory = Directory(folderPath);
+    List<AudioFile> audioFiles = [];
+    final directory = Directory(folderPath);
+    int coverSuccessCount = 0; // 封面提取成功计数器
 
-  if (!directory.existsSync()) {
-    debugPrint('[扫描错误] 文件夹不存在：$folderPath');
-    return audioFiles;
-  }
+    if (!directory.existsSync()) {
+      debugPrint('[AudioService] 扫描失败：文件夹不存在 $folderPath');
+      return audioFiles;
+    }
 
-  await for (var entity in directory.list(recursive: true)) {
-    if (entity is File) {
-      final extension = path.extension(entity.path).toLowerCase();
-      if (_supportedExtensions.contains(extension)) {
-        try {
-          // 读取音频元数据（包含封面）
-          final metadata = await readMetadata(
-            entity,
-            getImage: true, // 关键：获取封面
-          );
+    await for (var entity in directory.list(recursive: true)) {
+      if (entity is File) {
+        final extension = path.extension(entity.path).toLowerCase();
+        if (_supportedExtensions.contains(extension)) {
+          try {
+            final metadata = await readMetadata(entity, getImage: true);
+            
+            // 统计封面提取成功数，不逐个打印
+            Uint8List? albumArtBytes;
+            if (metadata.pictures.isNotEmpty && metadata.pictures.first.bytes != null) {
+              albumArtBytes = metadata.pictures.first.bytes;
+              coverSuccessCount++;
+            }
 
-          // 直接提取封面字节（不保存到文件）
-          Uint8List? albumArtBytes;
-          if (metadata.pictures.isNotEmpty && metadata.pictures.first.bytes != null) {
-            albumArtBytes = metadata.pictures.first.bytes;
-            debugPrint('[封面提取成功] ${entity.path}（大小：${albumArtBytes.lengthInBytes}字节）');
-          } else {
-            debugPrint('[封面提取失败] 无封面数据：${entity.path}');
+            audioFiles.add(AudioFile(
+              path: entity.path,
+              title: metadata.title ?? path.basenameWithoutExtension(entity.path),
+              artist: metadata.artist,
+              album: metadata.album,
+              duration: metadata.duration?.inMilliseconds,
+              albumArtBytes: albumArtBytes,
+            ));
+          } catch (e) {
+            // 只保留处理失败的文件日志
+            debugPrint('[AudioService] 处理音频文件失败：${entity.path}，原因：$e');
           }
-
-          // 构造AudioFile（使用字节数据）
-          final audioFile = AudioFile(
-            path: entity.path,
-            title: metadata.title ?? path.basenameWithoutExtension(entity.path),
-            artist: metadata.artist,
-            album: metadata.album,
-            duration: metadata.duration?.inMilliseconds,
-            albumArtBytes: albumArtBytes, // 存储字节数据
-          );
-          audioFiles.add(audioFile);
-
-        } catch (e) {
-          debugPrint('[文件处理错误] ${entity.path}：$e');
         }
       }
     }
+
+    await _saveAudioFiles(audioFiles);
+    // 最终打印扫描统计结果
+    debugPrint('[AudioService] 扫描文件夹 $folderPath：找到 ${audioFiles.length} 个音频文件，成功提取 $coverSuccessCount 个封面');
+    return audioFiles;
   }
 
-  await _saveAudioFiles(audioFiles);
-  return audioFiles;
-}
-
-  // 保存封面到临时目录（单独抽离，便于定位封面保存问题）
+  // 7. 封面保存：移除过程日志，只保留错误信息（成功不打印）
   Future<String?> _saveAlbumArtToTemp(Uint8List albumArtBytes, AudioMetadata metadata, File audioFile) async {
     try {
-      debugPrint('[AudioService] 开始保存封面：${audioFile.path}');
-      // 1. 获取临时目录
       final tempDir = await getTemporaryDirectory();
-      debugPrint('[AudioService] 临时目录：${tempDir.path}');
-
-      // 2. 创建封面存储子目录
       final artDir = Directory(p.join(tempDir.path, 'album_arts'));
+      
       if (!artDir.existsSync()) {
         artDir.createSync(recursive: true);
-        debugPrint('[AudioService] 新建封面目录：${artDir.path}');
       }
       if (!artDir.existsSync()) {
-        throw Exception('封面目录创建后仍不存在：${artDir.path}');
+        throw Exception('封面目录创建后仍不存在');
       }
 
-      // 3. 处理封面文件名（避免非法字符）
       String baseName = metadata.album ?? metadata.title ?? path.basenameWithoutExtension(audioFile.path);
-      baseName = baseName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'); // 过滤Windows非法字符
-      if (baseName.length > 50) baseName = baseName.substring(0, 50); // 限制长度
+      baseName = baseName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      if (baseName.length > 50) baseName = baseName.substring(0, 50);
       final fileName = '$baseName.jpg';
       final artFilePath = p.join(artDir.path, fileName);
-      debugPrint('[AudioService] 封面保存路径：$artFilePath');
 
-      // 4. 写入封面文件
       final artFile = File(artFilePath);
       await artFile.writeAsBytes(albumArtBytes);
-      // 校验写入结果
-      if (!artFile.existsSync()) {
-        throw Exception('封面写入后文件不存在：$artFilePath');
+      if (!artFile.existsSync() || artFile.lengthSync() != albumArtBytes.lengthInBytes) {
+        throw Exception('封面写入后校验失败');
       }
-      if (artFile.lengthSync() != albumArtBytes.lengthInBytes) {
-        throw Exception('封面文件大小不匹配（写入：${artFile.lengthSync()} 字节，原始：${albumArtBytes.lengthInBytes} 字节）：$artFilePath');
-      }
-      debugPrint('[AudioService] 封面保存成功：$artFilePath');
       return artFilePath;
-
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 封面保存失败：${audioFile.path}\n错误：$e\n堆栈：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 保存封面失败（文件：${audioFile.path}）：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       return null;
     }
   }
 
-  // 保存音频文件信息（添加存储数量和异常日志）
+  // 8. 保存音频信息：无日志（内部操作，失败由上层捕获）
   Future<void> _saveAudioFiles(List<AudioFile> audioFiles) async {
-  final prefs = await SharedPreferences.getInstance();
-  List<String> allAudioPaths = prefs.getStringList('all_audio_files') ?? [];
-  
-  for (var file in audioFiles) {
-    if (!allAudioPaths.contains(file.path)) {
-      allAudioPaths.add(file.path);
-    }
-  }
-  
-  await prefs.setStringList('all_audio_files', allAudioPaths);
-  
-  // 仅保存基础信息（不包含封面字节）
-  for (var file in audioFiles) {
-    await prefs.setString('${file.path}_title', file.title ?? '');
-    await prefs.setString('${file.path}_artist', file.artist ?? '');
-    await prefs.setString('${file.path}_album', file.album ?? '');
-    if (file.duration != null) {
-      await prefs.setInt('${file.path}_duration', file.duration!);
-    }
-  }
-}
-
-  // 获取所有音频文件（添加读取数量和异常日志）
-  // 获取所有音频文件（适配albumArtBytes，实时读取封面字节）
-Future<List<AudioFile>> getAllAudioFiles() async {
-  try {
-    debugPrint('[AudioService] 开始获取所有音频文件');
     final prefs = await SharedPreferences.getInstance();
     List<String> allAudioPaths = prefs.getStringList('all_audio_files') ?? [];
-    debugPrint('[AudioService] 路径列表长度：${allAudioPaths.length}');
-
-    List<AudioFile> audioFiles = [];
-    // 关键：将同步循环改为异步for循环（支持await读取元数据）
-    for (final path in allAudioPaths) {
-      try {
-        // 1. 校验文件是否存在（跳过已删除的文件）
-        final audioFile = File(path);
-        if (!audioFile.existsSync()) {
-          debugPrint('[AudioService] 跳过不存在的文件：$path');
-          continue;
-        }
-
-        // 2. 实时读取音频元数据（获取封面字节，不依赖持久化）
-        debugPrint('[AudioService] 读取文件元数据：$path');
-        final metadata = await readMetadata(
-          audioFile,
-          getImage: true, // 必须开启，才能获取封面
-        );
-
-        // 3. 提取封面字节（处理空值）
-        Uint8List? albumArtBytes;
-        if (metadata.pictures.isNotEmpty && metadata.pictures.first.bytes != null) {
-          albumArtBytes = metadata.pictures.first.bytes;
-          debugPrint('[AudioService] 成功获取封面：$path（大小：${albumArtBytes.lengthInBytes}字节）');
-        } else {
-          debugPrint('[AudioService] 无封面数据：$path');
-        }
-
-        // 4. 构造AudioFile（传入封面字节，替代原albumArtPath）
-        final newAudioFile = AudioFile(
-          path: path,
-          title: prefs.getString('${path}_title'),
-          artist: prefs.getString('${path}_artist'),
-          album: prefs.getString('${path}_album'),
-          duration: prefs.getInt('${path}_duration'),
-          albumArtBytes: albumArtBytes, // 传入实时读取的封面字节
-        );
-        audioFiles.add(newAudioFile);
-
-      } catch (e, stackTrace) {
-        // 单个文件处理失败：不中断循环，仅记录错误
-        debugPrint('[AudioService] 构造音频对象失败：$path\n错误：$e\n堆栈：$stackTrace', wrapWidth: 1024);
+    
+    for (var file in audioFiles) {
+      if (!allAudioPaths.contains(file.path)) {
+        allAudioPaths.add(file.path);
       }
     }
-
-    debugPrint('[AudioService] 成功获取 ${audioFiles.length} 个有效音频文件');
-    return audioFiles;
-
-  } catch (e, stackTrace) {
-    debugPrint('[AudioService] 获取所有音频文件失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
-    return [];
+    
+    await prefs.setStringList('all_audio_files', allAudioPaths);
+    
+    for (var file in audioFiles) {
+      await prefs.setString('${file.path}_title', file.title ?? '');
+      await prefs.setString('${file.path}_artist', file.artist ?? '');
+      await prefs.setString('${file.path}_album', file.album ?? '');
+      if (file.duration != null) {
+        await prefs.setInt('${file.path}_duration', file.duration!);
+      }
+    }
   }
-}
 
-  // 移除文件夹下的音频记录（添加删除数量日志）
-  Future<void> _removeAudioFilesFromFolder(String folderPath) async {
+  // 9. 获取所有音频：用批量统计替代逐个日志，失败文件汇总打印
+  Future<List<AudioFile>> getAllAudioFiles() async {
     try {
-      debugPrint('[AudioService] 开始移除文件夹下的音频记录：$folderPath');
       final prefs = await SharedPreferences.getInstance();
       List<String> allAudioPaths = prefs.getStringList('all_audio_files') ?? [];
+      if (allAudioPaths.isEmpty) {
+        debugPrint('[AudioService] 无已存储的音频文件路径');
+        return [];
+      }
 
-      // 筛选该文件夹下的音频路径
-      final filesToRemove = allAudioPaths.where((path) => 
-        path.startsWith(folderPath)
-      ).toList();
+      List<AudioFile> audioFiles = [];
+      List<String> failedFiles = []; // 失败文件记录
+
+      debugPrint('[AudioService] 开始加载 ${allAudioPaths.length} 个音频文件的元数据');
+      for (final filePath in allAudioPaths) {
+        try {
+          final audioFile = File(filePath);
+          if (!audioFile.existsSync()) {
+            failedFiles.add('$filePath（文件不存在）');
+            continue;
+          }
+
+          final metadata = await readMetadata(audioFile, getImage: true);
+          Uint8List? albumArtBytes;
+          if (metadata.pictures.isNotEmpty && metadata.pictures.first.bytes != null) {
+            albumArtBytes = metadata.pictures.first.bytes;
+          }
+
+          audioFiles.add(AudioFile(
+            path: filePath,
+            title: prefs.getString('${filePath}_title'),
+            artist: prefs.getString('${filePath}_artist'),
+            album: prefs.getString('${filePath}_album'),
+            duration: prefs.getInt('${filePath}_duration'),
+            albumArtBytes: albumArtBytes,
+          ));
+        } catch (e) {
+          failedFiles.add('$filePath（原因：$e）');
+        }
+      }
+
+      // 打印最终统计，失败文件汇总（避免刷屏）
+      debugPrint('[AudioService] 音频文件加载完成：成功 ${audioFiles.length} 个，失败 ${failedFiles.length} 个');
+      if (failedFiles.isNotEmpty) {
+        debugPrint('[AudioService] 失败文件列表：\n${failedFiles.join('\n')}', wrapWidth: 1024);
+      }
+      return audioFiles;
+    } catch (e, stackTrace) {
+      debugPrint('[AudioService] 加载所有音频文件失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
+      return [];
+    }
+  }
+
+  // 10. 移除文件夹音频记录：批量统计替代逐个日志
+  Future<void> _removeAudioFilesFromFolder(String folderPath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      List<String> allAudioPaths = prefs.getStringList('all_audio_files') ?? [];
+      final filesToRemove = allAudioPaths.where((path) => path.startsWith(folderPath)).toList();
+
       if (filesToRemove.isEmpty) {
-        debugPrint('[AudioService] 无匹配该文件夹的音频记录：$folderPath');
+        debugPrint('[AudioService] 无匹配文件夹 $folderPath 的音频记录');
         return;
       }
-      debugPrint('[AudioService] 匹配到 ${filesToRemove.length} 个需删除的音频记录');
 
-      // 1. 更新路径列表
+      // 更新路径列表
       allAudioPaths.removeWhere((path) => filesToRemove.contains(path));
       await prefs.setStringList('all_audio_files', allAudioPaths);
 
-      // 2. 删除关联元数据
+      // 批量删除元数据和封面，统计结果
       int removedCount = 0;
-      for (var file in filesToRemove) {
+      int removedCoverCount = 0;
+      final tempDir = await getTemporaryDirectory();
+      final artDir = Directory(p.join(tempDir.path, 'album_arts'));
+
+      for (var filePath in filesToRemove) {
         try {
-          await prefs.remove('${file}_title');
-          await prefs.remove('${file}_artist');
-          await prefs.remove('${file}_album');
-          await prefs.remove('${file}_duration');
+          await prefs.remove('${filePath}_title');
+          await prefs.remove('${filePath}_artist');
+          await prefs.remove('${filePath}_album');
+          await prefs.remove('${filePath}_duration');
           removedCount++;
-          // 可选：删除对应的封面文件（避免临时目录占用）
-          final tempDir = await getTemporaryDirectory();
-          final artDir = Directory(p.join(tempDir.path, 'album_arts'));
-          // 封面文件名生成逻辑需与_saveAlbumArtToTemp保持一致
-          String baseName = prefs.getString('${file}_album') ?? prefs.getString('${file}_title') ?? path.basenameWithoutExtension(file);
+
+          // 封面删除（统计数量，不逐个打印）
+          String baseName = prefs.getString('${filePath}_album') ?? prefs.getString('${filePath}_title') ?? path.basenameWithoutExtension(filePath);
           baseName = baseName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
           if (baseName.length > 50) baseName = baseName.substring(0, 50);
           final artFilePath = p.join(artDir.path, '$baseName.jpg');
           if (File(artFilePath).existsSync()) {
             await File(artFilePath).delete();
-            debugPrint('[AudioService] 删除关联封面：$artFilePath');
+            removedCoverCount++;
           }
         } catch (e) {
-          debugPrint('[AudioService] 删除音频记录失败：$file\n错误：$e', wrapWidth: 1024);
+          debugPrint('[AudioService] 删除音频记录失败：$filePath，原因：$e');
         }
       }
-      debugPrint('[AudioService] 音频记录删除完成：成功删除 $removedCount / ${filesToRemove.length} 个记录');
 
+      debugPrint('[AudioService] 批量删除完成：成功删除 $removedCount 条音频记录，$removedCoverCount 个封面文件');
     } catch (e, stackTrace) {
-      debugPrint('[AudioService] 批量删除音频记录失败：$e\n堆栈信息：$stackTrace', wrapWidth: 1024);
+      debugPrint('[AudioService] 批量删除音频记录失败：$e\n堆栈：$stackTrace', wrapWidth: 1024);
       rethrow;
     }
   }
