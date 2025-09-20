@@ -182,29 +182,78 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome>
           ),
 
           // 2. 新界面
-          if (_showNewScreen || _controller.status == AnimationStatus.reverse)
-            SlideTransition(
-              position: _slideAnimation,
-              child: Container(
-                margin: const EdgeInsets.only(top: titleBarHeight),
-                height: MediaQuery.of(context).size.height - titleBarHeight,
-                width: MediaQuery.of(context).size.width,
-                child: const NewScreen(),
-              ),
-            ),
+if (_showNewScreen || _controller.status == AnimationStatus.reverse)
+  SlideTransition(
+    position: _slideAnimation,
+    child: Container(
+      margin: const EdgeInsets.only(top: titleBarHeight),
+      height: MediaQuery.of(context).size.height - titleBarHeight,
+      width: MediaQuery.of(context).size.width,
+      child: NewScreen(
+        onBack: _toggleNewScreen, // 传递返回回调
+      ),
+    ),
+  ),
 
           // 3. 底部切换按钮
-          Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: ElevatedButton(
-                onPressed: _toggleNewScreen,
-                child: Text(_showNewScreen ? '返回主界面' : '打开新界面'),
-              ),
+          // 替换原底部切换按钮代码
+// 3. 底部音乐控制栏
+Positioned(
+  bottom: 0,
+  left: 0,
+  right: 0,
+  child: Container(
+    height: 60,
+    color: Colors.white,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // 歌曲信息
+        const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '当前播放歌曲',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
+            Text(
+              '艺术家',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+        
+        // 控制按钮
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.skip_previous),
+              onPressed: () {},
+            ),
+            IconButton(
+              icon: const Icon(Icons.play_arrow, size: 28),
+              onPressed: () {},
+            ),
+            IconButton(
+              icon: const Icon(Icons.skip_next),
+              onPressed: () {},
+            ),
+          ],
+        ),
+        
+        // 展开按钮（点击进入新界面）
+        IconButton(
+          icon: const Icon(Icons.expand_circle_down),
+          onPressed: _toggleNewScreen,
+        ),
+      ],
+    ),
+  ),
+),
 
           // 4. 标题栏
           Positioned(

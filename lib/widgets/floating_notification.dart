@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+// 定义通知弹出位置的枚举
+enum NotificationPosition {
+  topLeft,
+  topRight,
+  bottomLeft,  // 我们将修改这个位置的行为
+  bottomRight,
+  topCenter,
+  bottomCenter,
+  leftCenter,
+  rightCenter,
+}
+
 class FloatingNotification {
-  // 1. 新增：动画时长全局配置（默认400毫秒）
+  // 动画时长全局配置（默认400毫秒）
   static Duration animationDuration = const Duration(milliseconds: 400);
   
   // 存储当前显示的通知信息
@@ -11,10 +23,12 @@ class FloatingNotification {
   /// 显示悬浮通知
   /// [message]：通知内容
   /// [showDuration]：通知显示时长（默认2秒）
+  /// [position]：通知弹出位置（默认左下）
   static void show(
     BuildContext context, 
     String message, {
     Duration showDuration = const Duration(seconds: 2),
+    NotificationPosition position = NotificationPosition.bottomLeft,
   }) {
     // 如果有当前通知，标记为需要替换
     if (_currentNotification != null) {
@@ -27,6 +41,7 @@ class FloatingNotification {
     newNotification = _NotificationData(
       message: message,
       showDuration: showDuration,
+      position: position,
       onDismissed: () {
         if (_currentNotification == newNotification) {
           _currentNotification = null;
@@ -57,10 +72,11 @@ class FloatingNotification {
   }
 }
 
-// 通知数据类（新增显示时长参数）
+// 通知数据类
 class _NotificationData {
   final String message;
-  final Duration showDuration; // 显示时长
+  final Duration showDuration;
+  final NotificationPosition position;
   final VoidCallback? onDismissed;
   OverlayEntry? _entry;
   Timer? _timer;
@@ -69,10 +85,11 @@ class _NotificationData {
   _NotificationData({
     required this.message,
     required this.showDuration,
+    required this.position,
     this.onDismissed,
   });
 
-  // 开始计时（使用自定义的显示时长）
+  // 开始计时
   void startTimer() {
     _timer?.cancel();
     _timer = Timer(showDuration, () {
@@ -110,14 +127,15 @@ class _NotificationContentState extends State<_NotificationContent>
   @override
   void initState() {
     super.initState();
-    // 2. 使用全局配置的动画时长
+    
     _controller = AnimationController(
       vsync: this,
       duration: FloatingNotification.animationDuration,
     );
 
+    // 根据位置设置不同的动画
     _animation = Tween<Offset>(
-      begin: const Offset(0, 1.5),
+      begin: _getAnimationBeginOffset(),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
@@ -135,6 +153,90 @@ class _NotificationContentState extends State<_NotificationContent>
     });
 
     _controller.forward();
+  }
+
+  // 根据位置获取动画开始的偏移量
+  Offset _getAnimationBeginOffset() {
+    switch (widget.data.position) {
+      case NotificationPosition.topLeft:
+      case NotificationPosition.topCenter:
+      case NotificationPosition.topRight:
+        return const Offset(0, -1.5); // 从顶部外进入
+      case NotificationPosition.bottomLeft:
+        // 改为从左侧外进入（侧边滑入效果）
+        return const Offset(-1.5, 0); 
+      case NotificationPosition.bottomCenter:
+      case NotificationPosition.bottomRight:
+        return const Offset(0, 1.5); // 从底部外进入
+      case NotificationPosition.leftCenter:
+        return const Offset(-1.5, 0); // 从左侧外进入
+      case NotificationPosition.rightCenter:
+        return const Offset(1.5, 0); // 从右侧外进入
+    }
+  }
+
+  // 根据位置获取定位参数
+  Positioned _getPositionedWidget(Widget child) {
+    const horizontalMargin = 16.0;
+    // 底部距离改为60像素
+    const bottomMargin = 60.0;
+    const topMargin = 16.0;
+    
+    switch (widget.data.position) {
+      case NotificationPosition.topLeft:
+        return Positioned(
+          top: topMargin,
+          left: horizontalMargin,
+          child: child,
+        );
+      case NotificationPosition.topRight:
+        return Positioned(
+          top: topMargin,
+          right: horizontalMargin,
+          child: child,
+        );
+      case NotificationPosition.bottomLeft:
+        // 重点修改：底部距离设为60像素
+        return Positioned(
+          bottom: bottomMargin,
+          left: horizontalMargin,
+          child: child,
+        );
+      case NotificationPosition.bottomRight:
+        return Positioned(
+          bottom: topMargin,
+          right: horizontalMargin,
+          child: child,
+        );
+      case NotificationPosition.topCenter:
+        return Positioned(
+          top: topMargin,
+          left: 0,
+          right: 0,
+          child: Center(child: child),
+        );
+      case NotificationPosition.bottomCenter:
+        return Positioned(
+          bottom: topMargin,
+          left: 0,
+          right: 0,
+          child: Center(child: child),
+        );
+      case NotificationPosition.leftCenter:
+        return Positioned(
+          top: 0,
+          bottom: 0,
+          left: horizontalMargin,
+          child: Center(child: child),
+        );
+      case NotificationPosition.rightCenter:
+        return Positioned(
+          top: 0,
+          bottom: 0,
+          right: horizontalMargin,
+          child: Center(child: child),
+        );
+    }
   }
 
   @override
@@ -164,10 +266,8 @@ class _NotificationContentState extends State<_NotificationContent>
       _startExitAnimation();
     }
 
-    return Positioned(
-      left: 16,
-      bottom: 16,
-      child: SlideTransition(
+    return _getPositionedWidget(
+      SlideTransition(
         position: _animation,
         child: Material(
           color: Colors.transparent,
@@ -203,3 +303,4 @@ class _NotificationContentState extends State<_NotificationContent>
     );
   }
 }
+    
