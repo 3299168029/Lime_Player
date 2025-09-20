@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'components/title_bar.dart';
@@ -10,7 +12,7 @@ import 'screens/folders_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/new_screen.dart';
 import 'animations/screen_transitions.dart';
-
+import 'widgets/bottom_player_bar.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
@@ -43,6 +45,10 @@ class MusicPlayerHome extends StatefulWidget {
 
 class _MusicPlayerHomeState extends State<MusicPlayerHome> 
     with WindowListener, SingleTickerProviderStateMixin {
+  String? _currentSongTitle;
+  String? _currentArtist;
+  Uint8List? _currentAlbumArt; // 存储当前歌曲的专辑封面字节
+
   // 原有状态
   bool isMaximized = false;
   int _selectedSidebarIndex = 0;
@@ -202,57 +208,12 @@ Positioned(
   bottom: 0,
   left: 0,
   right: 0,
-  child: Container(
-    height: 60,
-    color: Colors.white,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // 歌曲信息
-        const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '当前播放歌曲',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              '艺术家',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        
-        // 控制按钮
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.skip_previous),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.play_arrow, size: 28),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.skip_next),
-              onPressed: () {},
-            ),
-          ],
-        ),
-        
-        // 展开按钮（点击进入新界面）
-        IconButton(
-          icon: const Icon(Icons.expand_circle_down),
-          onPressed: _toggleNewScreen,
-        ),
-      ],
-    ),
-  ),
+  child: BottomPlayerBar(
+            onExpand: _toggleNewScreen, // 传递展开回调
+            // 可以根据实际播放状态动态传递歌曲信息
+            // songTitle: _currentSong?.title,
+            // artistName: _currentSong?.artist,
+          ),
 ),
 
           // 4. 标题栏

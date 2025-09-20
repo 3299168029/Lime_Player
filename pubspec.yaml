@@ -20,6 +20,9 @@ dependencies:
   path_provider: ^2.0.15 # 用于获取临时目录
   shared_preferences: ^2.2.2  # 新增，用于保存设置和音频信息
 
+  sqflite: ^2.3.0 # 某些音频查询库可能需要
+  permission_handler: ^10.2.0 # 处理权限请求
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

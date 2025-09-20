@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:music_player/models/music_models.dart';
+import 'package:music_player/services/playlist_service.dart';
 import 'package:music_player/widgets/album_cover.dart';
+import 'package:music_player/widgets/floating_notification.dart';
 import '../services/audio_service.dart';
 
 class MusicLibraryScreen extends StatefulWidget {
@@ -28,6 +31,44 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen> {
       _isLoading = false;
     });
   }
+
+  Future<void> _showSongOptions(BuildContext context, AudioFile audio) async {
+  final playlists = await PlaylistService().getAllPlaylists();
+  
+  if (playlists.isEmpty) {
+    FloatingNotification.show(context, '请先创建歌单');
+    return;
+  }
+
+  showModalBottomSheet(
+    context: context,
+    builder: (context) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('添加到歌单', style: TextStyle(fontSize: 18)),
+        ),
+        ...playlists.map((playlist) => ListTile(
+          title: Text(playlist.name),
+          onTap: () async {
+            await PlaylistService().addSongToPlaylist(
+              playlist.id, 
+              audio.path
+            );
+            if (mounted) {
+              Navigator.pop(context);
+              FloatingNotification.show(
+                context, 
+                '已添加到 ${playlist.name}'
+              );
+            }
+          },
+        )),
+      ],
+    ),
+  );
+}
 
   // 格式化时长（毫秒转分:秒）
   String _formatDuration(int? milliseconds) {
@@ -58,24 +99,33 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen> {
                   final audio = _audioFiles[index];
                   return ListTile(
                     // 移除封面显示，只用默认音乐图标
-                    leading: AlbumCover(
-              // 使用上面定义的audioFile变量，而非其他名称
-              albumArtBytes: audio.albumArtBytes, 
-              size: 50,
-            ),
-                    title: Text(
-                      audio.title ?? '未知标题',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      '${audio.artist ?? '未知艺术家'} - ${audio.album ?? '未知专辑'}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Text(_formatDuration(audio.duration)),
-                    onTap: () {
-                      // 可添加播放逻辑
-                    },
-                  );
+
+  leading: AlbumCover(
+    albumArtBytes: audio.albumArtBytes,
+    size: 50,
+  ),
+  title: Text(
+    audio.title ?? '未知标题',
+    overflow: TextOverflow.ellipsis,
+  ),
+  subtitle: Text(
+    '${audio.artist ?? '未知艺术家'} - ${audio.album ?? '未知专辑'}',
+    overflow: TextOverflow.ellipsis,
+  ),
+  trailing: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(_formatDuration(audio.duration)),
+      IconButton(
+        icon: const Icon(Icons.more_vert),
+        onPressed: () => _showSongOptions(context, audio),
+      ),
+    ],
+  ),
+  onTap: () {
+    // 原播放逻辑
+  },
+);
                 },
               ),
             ),

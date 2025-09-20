@@ -8,24 +8,6 @@ import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:music_player/models/music_models.dart';
 import 'package:path_provider/path_provider.dart';
 
-class AudioFile {
-  final String path;
-  final String? title;
-  final String? artist;
-  final String? album;
-  final int? duration;
-  final Uint8List? albumArtBytes;
-
-  AudioFile({
-    required this.path,
-    this.title,
-    this.artist,
-    this.album,
-    this.duration,
-    this.albumArtBytes,
-  });
-}
-
 class AudioService {
   final List<String> _supportedExtensions = [
     '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg'

@@ -1,7 +1,25 @@
 import 'package:flutter/foundation.dart';
 import '../../services/audio_service.dart';// 导入之前的AudioFile模型
 
+import 'dart:typed_data';
 
+class AudioFile {
+  final String path;
+  final String? title;
+  final String? artist;
+  final String? album;
+  final int? duration;
+  final Uint8List? albumArtBytes;
+
+  AudioFile({
+    required this.path,
+    this.title,
+    this.artist,
+    this.album,
+    this.duration,
+    this.albumArtBytes,
+  });
+}
 
 
 
@@ -9,7 +27,7 @@ import '../../services/audio_service.dart';// 导入之前的AudioFile模型
 // 艺术家模型
 class Artist {
   final String name; // 艺术家名称（"未知艺术家"作为默认）
-  final List<AudioFile> songs; // 该艺术家的所有歌曲
+  final List<AudioFile> songs; // 现在引用的是统一模型
 
   Artist({
     required this.name,
